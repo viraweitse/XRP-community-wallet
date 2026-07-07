@@ -75,14 +75,22 @@ export async function fetchXrplHistory(address: string, limit = 30): Promise<His
     const status: 'completed' | 'failed' =
       entry.meta?.TransactionResult === 'tesSUCCESS' ? 'completed' : 'failed';
 
+    // XRPL partial payments (tfPartialPayment) set `Amount` to the sender-specified *maximum*,
+    // while the value actually delivered is `meta.delivered_amount`. Displaying `Amount` lets an
+    // attacker show the victim a huge "incoming" payment that never arrived (fake-deposit social
+    // engineering), so always prefer the delivered amount when the ledger reports it.
+    const delivered = entry.meta?.delivered_amount;
+    const effectiveAmount =
+      delivered !== undefined && delivered !== 'unavailable' ? delivered : tx.Amount;
+
     let amount: HistoryTx['amount'];
-    if (typeof tx.Amount === 'string') {
-      amount = { currency: 'XRP' as const, drops: tx.Amount };
-    } else if (tx.Amount && typeof tx.Amount === 'object' && tx.Amount.value) {
+    if (typeof effectiveAmount === 'string') {
+      amount = { currency: 'XRP' as const, drops: effectiveAmount };
+    } else if (effectiveAmount && typeof effectiveAmount === 'object' && effectiveAmount.value) {
       amount = {
-        currency: tx.Amount.currency ?? '?',
-        value: tx.Amount.value,
-        issuer: tx.Amount.issuer ?? null,
+        currency: effectiveAmount.currency ?? '?',
+        value: effectiveAmount.value,
+        issuer: effectiveAmount.issuer ?? null,
       };
     } else {
       continue;
