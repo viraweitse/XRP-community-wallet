@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Banner, Button, Card, useMediaQuery } from '@rc/ui';
+import { Banner, Button, Card, LoadingState, useMediaQuery } from '@rc/ui';
 import { useHistoryData } from './hooks/useHistoryData';
 import { applyFilters, emptyFilters, isDefaultFilters, type TxFilters as TxFiltersState, type PeriodFilter, type StatusFilter } from './lib/filters';
 import { TxFilters } from './components/TxFilters';
@@ -15,7 +15,7 @@ function readFiltersFromUrl(sp: URLSearchParams): TxFiltersState {
   const f = emptyFilters();
   const tParam = sp.get('type');
   if (tParam) {
-    const allowed: TxType[] = ['payment', 'staking_deposit', 'staking_payout'];
+    const allowed: TxType[] = ['payment'];
     if (allowed.includes(tParam as TxType)) {
       f.types = new Set([tParam as TxType]);
     }
@@ -36,7 +36,7 @@ function readFiltersFromUrl(sp: URLSearchParams): TxFiltersState {
 export function HistoryPage() {
   const { t } = useTranslation('history');
   const [searchParams, setSearchParams] = useSearchParams();
-  const { txs, hasErrors } = useHistoryData();
+  const { txs, loading, hasErrors } = useHistoryData();
   const isMobile = useMediaQuery('(max-width: 767px)');
 
   const [filters, setFilters] = useState<TxFiltersState>(() => readFiltersFromUrl(searchParams));
@@ -98,7 +98,13 @@ export function HistoryPage() {
         </Card>
       )}
 
-      {totalCount === 0 ? (
+      {loading && totalCount === 0 ? (
+        // Live XRPL/EVM history is still loading — don't render the "you have no transactions"
+        // empty state, which flashed on funded accounts for the duration of the network fetch.
+        <Card>
+          <LoadingState variant="card" label={t('title')} />
+        </Card>
+      ) : totalCount === 0 ? (
         <Card>
           <EmptyHistory filtered={false} />
         </Card>
