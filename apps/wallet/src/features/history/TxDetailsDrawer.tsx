@@ -6,6 +6,26 @@ import { useTranslation } from 'react-i18next';
 import type { HistoryTx } from './lib/types';
 import { TxStatusBadge } from './components/TxStatusBadge';
 import { TxAmount } from './components/TxAmount';
+import { formatDecimal } from '~/lib/chains/balances';
+
+/**
+ * Network fee, correctly unit'd per chain. EVM fees are stored in wei (18 decimals) of the
+ * chain's native coin — rendering them with `dropsToXrp` (÷1e6) + a hardcoded "XRP" label showed
+ * a 0.00044 ETH fee as "441000000 XRP". XRPL fees (native or issued-currency payments) are XRP drops.
+ */
+function feeDisplay(tx: HistoryTx): string {
+  if ('raw' in tx.amount) {
+    const symbol = tx.amount.chain === 'eth' ? 'ETH' : tx.amount.chain === 'bsc' ? 'BNB' : 'MATIC';
+    let wei: bigint;
+    try {
+      wei = BigInt(tx.fee.drops || '0');
+    } catch {
+      wei = 0n;
+    }
+    return `${formatCrypto(formatDecimal(wei, 18), symbol).value} ${symbol}`;
+  }
+  return `${formatCrypto(dropsToXrp(tx.fee.drops), 'XRP').value} XRP`;
+}
 
 interface Props {
   tx: HistoryTx | null;
@@ -52,9 +72,7 @@ function Body({ tx, onCopy }: { tx: HistoryTx; onCopy: (s: string) => void }) {
           <TxAmount tx={tx} />
         </Row>
         <Row label={t('details.fee')}>
-          <span className="text-neutral-900">
-            {formatCrypto(dropsToXrp(tx.fee.drops), 'XRP').value} XRP
-          </span>
+          <span className="text-neutral-900">{feeDisplay(tx)}</span>
         </Row>
         <Row label={tx.direction === 'outgoing' ? t('details.to') : t('details.from')}>
           <div className="font-mono text-neutral-900 break-all">
