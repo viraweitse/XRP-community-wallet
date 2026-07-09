@@ -27,6 +27,7 @@ import {
   type Transaction,
 } from '@rc/types';
 import { useRecentUserTxs } from '../hooks/useRecentUserTxs';
+import { useActiveAccount } from '~/lib/wallet/useWallet';
 
 function statusVariant(s: Transaction['status']) {
   if (s === 'completed') return 'success' as const;
@@ -49,15 +50,18 @@ function txAmountDisplay(tx: Transaction): string {
   return `${f.value} ${f.symbol}`;
 }
 
-function txSource(tx: Transaction): string {
-  if (tx.direction === 'outgoing') return 'Treasury Account';
+// The user's own side of a tx is labelled with the active wallet's own label/address — not the
+// hardcoded English string "Treasury Account", which both violated the i18n rule and factually
+// mislabelled the user's own wallet as a treasury on every real transaction.
+function txSource(tx: Transaction, ownLabel: string): string {
+  if (tx.direction === 'outgoing') return ownLabel;
   return tx.counterparty.label ?? maskAddress(tx.counterparty.address);
 }
 
-function txDestination(tx: Transaction): string {
+function txDestination(tx: Transaction, ownLabel: string): string {
   if (tx.direction === 'outgoing')
     return tx.counterparty.label ?? maskAddress(tx.counterparty.address);
-  return 'Treasury Account';
+  return ownLabel;
 }
 
 export function LastTransactionsCard() {
@@ -66,6 +70,8 @@ export function LastTransactionsCard() {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 767px)');
   const items = useRecentUserTxs(5);
+  const { profile } = useActiveAccount();
+  const ownLabel = profile?.label?.trim() || (profile ? maskAddress(profile.address) : '—');
 
   return (
     <Card>
@@ -102,7 +108,7 @@ export function LastTransactionsCard() {
               }
               middle={
                 <span className="text-neutral-500">
-                  {truncateMiddle(txSource(tx), 24)} → {truncateMiddle(txDestination(tx), 24)}
+                  {truncateMiddle(txSource(tx, ownLabel), 24)} → {truncateMiddle(txDestination(tx, ownLabel), 24)}
                 </span>
               }
               bottom={txAmountDisplay(tx)}
@@ -132,13 +138,13 @@ export function LastTransactionsCard() {
               <Tr key={tx.id}>
                 <Td className="text-neutral-500">{formatDateTime(tx.createdAt)}</Td>
                 <Td>
-                  <div className="truncate" title={txSource(tx)}>
-                    {txSource(tx)}
+                  <div className="truncate" title={txSource(tx, ownLabel)}>
+                    {txSource(tx, ownLabel)}
                   </div>
                 </Td>
                 <Td>
-                  <div className="truncate" title={txDestination(tx)}>
-                    {txDestination(tx)}
+                  <div className="truncate" title={txDestination(tx, ownLabel)}>
+                    {txDestination(tx, ownLabel)}
                   </div>
                 </Td>
                 <Td align="right" className="text-neutral-900 font-medium">
